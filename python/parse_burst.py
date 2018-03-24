@@ -20,6 +20,7 @@
 # 
 
 import numpy
+import pmt
 from gnuradio import gr
 
 class parse_burst(gr.sync_block):
@@ -29,14 +30,36 @@ class parse_burst(gr.sync_block):
     def __init__(self, samp_rate):
         gr.sync_block.__init__(self,
             name="parse_burst",
-            in_sig=[<+numpy.float32+>],
-            out_sig=[<+numpy.float32+>])
+            in_sig=[],
+            out_sig=[])
 
+        self.samp_rate=samp_rate
+
+        self.message_port_register_in(pmt.intern("pdu"))
+        self.message_port_register_out(pmt.intern("data"))
+        self.set_msg_handler(pmt.intern("pdu"),self.parser)
+        
+    def parser(self,msg):
+        # Get data from pdu
+        cdr = pmt.cdr(msg);
+        data= copy(numpy.array(pmt.f32vector_elements(cdr), dtype=numpy.float32))
+
+        # Calculate number of samples per half bit
+        interpolation=30*self.samp_rate/250000
+        self.threshold=.5
+
+        # Find first transition
+        first_transition=numpy.argmax(data>self.threshold)
+        burst_width=numpy.argmax(data[first_transition:]<self.threshold)
+        while burst_width<10:
+            first_transition=numpy.argmax(data[first_transition+burst_width+1:]>self.threshold)+first_transition+burst_width+1
+            burst_width=numpy.argmax(data[first_transition:]<self.threshold)
+        next_expected_transition=first_transition
+        next_expected_transition+=interpolation*2
+
+        # The first transition is a zero bit
+        bits=[0]
 
     def work(self, input_items, output_items):
-        in0 = input_items[0]
-        out = output_items[0]
-        # <+signal processing here+>
-        out[:] = in0
-        return len(output_items[0])
+        pass
 
