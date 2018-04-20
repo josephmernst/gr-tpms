@@ -21,6 +21,7 @@
 
 import numpy
 import pmt
+from copy import deepcopy as copy
 from gnuradio import gr
 
 class parse_burst(gr.sync_block):
@@ -40,6 +41,7 @@ class parse_burst(gr.sync_block):
         self.set_msg_handler(pmt.intern("pdu"),self.parser)
         
     def parser(self,msg):
+        print "parser"
         # Get data from pdu
         cdr = pmt.cdr(msg);
         data= copy(numpy.array(pmt.f32vector_elements(cdr), dtype=numpy.float32))
@@ -60,6 +62,42 @@ class parse_burst(gr.sync_block):
         # The first transition is a zero bit
         bits=[0]
 
+        while True:
+            interp2=int(interpolation*.5)
+            # Grab a chunk of data around the next bit
+            chunk=data[next_expected_transition-interp2:next_expected_transition+interp2]
+            # If there wasn't enough data then exit
+            if len(chunk)<interp2*1.5:
+                break
+
+            # Break into data before and after the transition
+            chunk1=chunk[:interp2]
+            chunk2=chunk[interp2:]
+
+            # Calculate whether it is a falling or rising transition
+            d=sum(chunk2)-sum(chunk1)
+            if abs(d)<10:
+                break # If there is no transition then the packet is done
+            if d>0:
+                bits.append(0)
+            else:
+                bits.append(1)
+
+            ## Determine the next expected transition location
+            dc=numpy.abs(numpy.diff(chunk))
+            amax=numpy.argmax(dc)
+            drift=amax-(interp2-1)
+
+            if abs(drift<15):
+                next_expected_transition+=drift
+            next_expected_transition+=interpolation*2
+
+        cdr=pmt.init_u8vector(len(bits),bits)
+        msg=pmt.cons(pmt.PMT_NIL,cdr)
+        self.message_port_pub(pmt.intern("data"),msg)
+
+
+        
     def work(self, input_items, output_items):
         pass
 

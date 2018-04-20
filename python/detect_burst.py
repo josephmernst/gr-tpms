@@ -20,6 +20,7 @@
 # 
 
 import numpy
+import pmt
 from gnuradio import gr
 
 class detect_burst(gr.sync_block):
