@@ -41,7 +41,6 @@ class parse_burst(gr.sync_block):
         self.set_msg_handler(pmt.intern("pdu"),self.parser)
         
     def parser(self,msg):
-        print "parser"
         # Get data from pdu
         cdr = pmt.cdr(msg);
         data= copy(numpy.array(pmt.f32vector_elements(cdr), dtype=numpy.float32))
@@ -63,6 +62,7 @@ class parse_burst(gr.sync_block):
         bits=[0]
 
         while True:
+            next_expected_transition=int(next_expected_transition)
             interp2=int(interpolation*.5)
             # Grab a chunk of data around the next bit
             chunk=data[next_expected_transition-interp2:next_expected_transition+interp2]
